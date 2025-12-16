@@ -220,8 +220,8 @@ with gr.Blocks(title="GLMTTS Inference") as app:
 
 if __name__ == "__main__":
     app.queue().launch(
-        server_name="0.0.0.0", 
-        server_port=8048, 
+        # server_name="0.0.0.0", 
+        # server_port=8048, 
         theme=gr.themes.Soft(),
         share=False
     )
