@@ -56,7 +56,13 @@ def load_quantize_encoder(model_path):
                     state_dict[new_key] = f.get_tensor(key)
     model.load_state_dict(state_dict)
     model.eval()
-    model.cuda()
+    # Prioritize CUDA, then MPS (Apple Silicon), then CPU
+    device = torch.device(
+        "cuda" if torch.cuda.is_available() else
+        "mps" if torch.backends.mps.is_available() else
+        "cpu"
+    )
+    model.to(device)
     return model
 
 def load_speech_tokenizer(model_path):

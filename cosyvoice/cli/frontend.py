@@ -55,12 +55,19 @@ class SpeechTokenizer:
         self.model = model
         self.feature_extractor = feature_extractor
         self._resample_buffer: dict[int, torchaudio.transforms.Resample] = {}
+        # Prioritize CUDA, then MPS (Apple Silicon), then CPU
+        self.device = torch.device(
+            "cuda" if torch.cuda.is_available() else
+            "mps" if torch.backends.mps.is_available() else
+            "cpu"
+        )
 
     def extract_speech_token(self, utts: List[Union[str, Tuple[torch.Tensor, int]]]) -> List[List[int]]:
         assert isinstance(utts, list)
 
         _resample_buffer = self._resample_buffer
         model, feature_extractor = self.model, self.feature_extractor
+        device = self.device
 
         with torch.no_grad():
             audios, indices = [], []
@@ -70,7 +77,7 @@ class SpeechTokenizer:
                 else:
                     audio, sample_rate = torchaudio.load(utt)
 
-                audio = audio.cuda()
+                audio = audio.to(device)
 
                 # Resample to 16k if needed
                 if sample_rate != 16000:
@@ -78,7 +85,7 @@ class SpeechTokenizer:
                         _resample_buffer[sample_rate] = torchaudio.transforms.Resample(
                             orig_freq=sample_rate,
                             new_freq=16000
-                        ).to('cuda')
+                        ).to(device)
                     audio = _resample_buffer[sample_rate](audio)
 
                 audio = audio[0]  # Take first channel
@@ -99,9 +106,9 @@ class SpeechTokenizer:
 
             for start in range(0, len(audios), batch_size):
                 features = feature_extractor(audios[start: start + batch_size], sampling_rate=16000,
-                                             return_attention_mask=True, return_tensors="pt", device='cuda',
+                                             return_attention_mask=True, return_tensors="pt", device=device,
                                              padding="longest", pad_to_multiple_of=stride)
-                features = features.to(device="cuda")
+                features = features.to(device=device)
                 outputs = model(**features)
                 speech_tokens = outputs.quantized_token_ids
 
@@ -628,7 +635,7 @@ class TTSFrontEnd:
 
     def _extract_spk_embedding(self, speech: Union[str, torch.Tensor]) -> torch.Tensor:
         if isinstance(speech, str):
-            speech = load_wav(speech, 16000)
+            speech = load_wav(speech, 16000, device=self.device)
 
         feat = kaldi.fbank(speech,
                            num_mel_bins=80,
@@ -645,7 +652,7 @@ class TTSFrontEnd:
 
     def _extract_speech_feat(self, speech, sample_rate=24000):
         if isinstance(speech, str):
-            speech = load_wav(speech, sample_rate)
+            speech = load_wav(speech, sample_rate, device=self.device)
         speech = speech.to(self.device)
         speech_feat = self.feat_extractor(speech).squeeze(dim=0).transpose(0, 1).to(self.device)
         speech_feat = speech_feat.unsqueeze(dim=0)

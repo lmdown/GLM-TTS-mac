@@ -33,16 +33,24 @@ def read_json_lists(list_file):
             results.update(json.load(fin))
     return results
 
-def load_wav(wav, target_sr):
+def load_wav(wav, target_sr, device=None):
+    import torch
+    # Prioritize CUDA, then MPS (Apple Silicon), then CPU if no device specified
+    if device is None:
+        device = torch.device(
+            "cuda" if torch.cuda.is_available() else
+            "mps" if torch.backends.mps.is_available() else
+            "cpu"
+        )
     speech, sample_rate = torchaudio.load(wav)
-    speech = speech.to("cuda")
+    speech = speech.to(device)
     speech = speech.mean(dim=0, keepdim=True)
     if sample_rate != target_sr:
         resampler = torchaudio.transforms.Resample(
                     orig_freq=sample_rate,
                     new_freq=target_sr
-                ).to('cuda')
-        speech = resampler(speech).to("cuda")
+                ).to(device)
+        speech = resampler(speech).to(device)
     return speech
 
 def speed_change(waveform, sample_rate, speed_factor: str):

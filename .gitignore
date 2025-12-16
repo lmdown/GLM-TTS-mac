@@ -64,3 +64,5 @@ model_cache/*
 web_service/
 helps/
 ckpt/
+
+venv/

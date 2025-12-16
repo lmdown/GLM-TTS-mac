@@ -15,16 +15,24 @@ import torchaudio
 import json
 import os
 
-def load_wav(wav, target_sr):
+def load_wav(wav, target_sr, device=None):
+    import torch
+    # Prioritize CUDA, then MPS (Apple Silicon), then CPU if no device specified
+    if device is None:
+        device = torch.device(
+            "cuda" if torch.cuda.is_available() else
+            "mps" if torch.backends.mps.is_available() else
+            "cpu"
+        )
     speech, sample_rate = torchaudio.load(wav)
-    speech = speech.to("cuda")
+    speech = speech.to(device)
     speech = speech.mean(dim=0, keepdim=True)
     if sample_rate != target_sr:
         resampler = torchaudio.transforms.Resample(
                     orig_freq=sample_rate,
                     new_freq=target_sr
-                ).to('cuda')
-        speech = resampler(speech).to("cuda")
+                ).to(device)
+        speech = resampler(speech).to(device)
     return speech
 
 def get_jsonl(jsonl_file_path=None):

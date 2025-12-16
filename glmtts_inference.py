@@ -29,7 +29,12 @@ from utils.audio import mel_spectrogram
 from functools import partial
 # --- Global Constants ---
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# Prioritize CUDA, then MPS (Apple Silicon), then CPU
+DEVICE = torch.device(
+    "cuda" if torch.cuda.is_available() else
+    "mps" if torch.backends.mps.is_available() else
+    "cpu"
+)
 MAX_LLM_SEQ_INP_LEN = 750
 TOKEN_RATE = 25
 EOS_TOKEN_ID_AFTER_MINUS_BOS = None
